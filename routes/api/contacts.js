@@ -1,16 +1,16 @@
 const express = require("express");
-const Joi = require("joi");
+const { joiContactsSchema, joiFavoriteStatusSchema } = require("../../models/contactModel");
 
-const { listContacts, getContactById, addContact, removeContact, updateContact } = require("../../models/contacts");
+const {
+	listContacts,
+	getContactById,
+	addContact,
+	removeContact,
+	updateContact,
+	updateStatusContact,
+} = require("../../models/contacts");
 
 const router = express.Router();
-
-const postContactsSchema = Joi.object({
-	id: Joi.string(),
-	name: Joi.string().required(),
-	email: Joi.string().min(4).required(),
-	phone: Joi.string().required(),
-});
 
 router.get("/", async (req, res, next) => {
 	try {
@@ -50,7 +50,7 @@ router.get("/:contactId", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
 	try {
-		const { error } = postContactsSchema.validate(req.body);
+		const { error } = joiContactsSchema.validate(req.body);
 		if (error) {
 			error.status = 400;
 			error.message = "missing required name field";
@@ -89,7 +89,7 @@ router.delete("/:contactId", async (req, res, next) => {
 
 router.put("/:contactId", async (req, res, next) => {
 	try {
-		const { error } = postContactsSchema.validate(req.body);
+		const { error } = joiContactsSchema.validate(req.body);
 		if (error) {
 			error.status = 400;
 			error.message = "missing fields";
@@ -98,6 +98,35 @@ router.put("/:contactId", async (req, res, next) => {
 
 		const { contactId } = req.params;
 		const updatedContact = await updateContact(contactId, req.body);
+		if (!updatedContact) {
+			const error = new Error("Not found");
+			error.status = 404;
+			throw error;
+		}
+		res.status(200).json({
+			status: "success",
+			code: 200,
+			data: {
+				updatedContact,
+			},
+		});
+	} catch (error) {
+		next(error);
+	}
+});
+
+router.patch("/:contactId/favorite", async (req, res, next) => {
+	try {
+		const { error } = joiFavoriteStatusSchema.validate(req.body);
+		if (error) {
+			error.status = 400;
+			error.message = "missing field favorite";
+			throw error;
+		}
+
+		const { contactId } = req.params;
+		const { favorite } = req.body;
+		const updatedContact = await updateStatusContact(contactId, { favorite });
 		if (!updatedContact) {
 			const error = new Error("Not found");
 			error.status = 404;
