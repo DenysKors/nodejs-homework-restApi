@@ -1,5 +1,6 @@
 const express = require("express");
 const { joiContactsSchema, joiFavoriteStatusSchema } = require("../../models/contactModel");
+const { authProtect } = require("../../middlewares/authMiddleware");
 
 const {
 	listContacts,
@@ -12,14 +13,19 @@ const {
 
 const router = express.Router();
 
+router.use(authProtect);
+
 router.get("/", async (req, res, next) => {
 	try {
-		const contacts = await listContacts();
+		const { _id } = req.user;
+		const { page = 1, limit = 20, favorite } = req.query;
+		const favoriteOption = favorite ? true : [true, false];
+		const contacts = await listContacts(_id, page, limit, favoriteOption);
 		res.status(200).json({
 			status: "success",
 			code: 200,
 			data: {
-				contacts,
+				result: contacts,
 			},
 		});
 	} catch (error) {
@@ -40,7 +46,7 @@ router.get("/:contactId", async (req, res, next) => {
 			status: "success",
 			code: 200,
 			data: {
-				contactById,
+				result: contactById,
 			},
 		});
 	} catch (error) {
@@ -56,12 +62,13 @@ router.post("/", async (req, res, next) => {
 			error.message = "missing required name field";
 			throw error;
 		}
-		const newContact = await addContact(req.body);
+		const { _id } = req.user;
+		const newContact = await addContact({ ...req.body, owner: _id });
 		res.status(201).json({
 			status: "success",
 			code: 201,
 			data: {
-				newContact,
+				result: newContact,
 			},
 		});
 	} catch (error) {
@@ -107,7 +114,7 @@ router.put("/:contactId", async (req, res, next) => {
 			status: "success",
 			code: 200,
 			data: {
-				updatedContact,
+				result: updatedContact,
 			},
 		});
 	} catch (error) {
@@ -136,7 +143,7 @@ router.patch("/:contactId/favorite", async (req, res, next) => {
 			status: "success",
 			code: 200,
 			data: {
-				updatedContact,
+				result: updatedContact,
 			},
 		});
 	} catch (error) {
