@@ -1,7 +1,8 @@
 const express = require("express");
 const { joiRegistrUserSchema, joiLoginSchema, joiSubscrSchema } = require("../../models/userModel");
-const { registerUser, loginUser, logoutUser, updateUserSubscr } = require("../../models/users");
+const { registerUser, loginUser, logoutUser, updateUserSubscr, updateUserAvatar } = require("../../models/users");
 const { authProtect } = require("../../middlewares/authMiddleware");
+const { uploadUserAvatar } = require("../../middlewares/userMiddleware");
 
 const router = express.Router();
 
@@ -27,6 +28,7 @@ router.post("/register", async (req, res, next) => {
 			user: {
 				email: newUser.email,
 				subscription: newUser.subscription,
+				avatarURL: newUser.avatarURL,
 			},
 		});
 	} catch (error) {
@@ -109,5 +111,7 @@ router.patch("/subscription", authProtect, async (req, res, next) => {
 		next(error);
 	}
 });
+
+router.patch("/avatars", authProtect, uploadUserAvatar, updateUserAvatar);
 
 module.exports = router;

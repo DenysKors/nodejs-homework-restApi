@@ -1,5 +1,16 @@
-const { User } = require("./userModel");
+const path = require("path");
+const fs = require("fs").promises;
+
+const Jimp = require("jimp");
 const jwt = require("jsonwebtoken");
+const gravatar = require("gravatar");
+const { customAlphabet } = require("nanoid");
+
+const { User } = require("./userModel");
+
+const nanoid = customAlphabet("1234567890", 5);
+
+const avatarDir = path.join(__dirname, "..", "public", "avatars");
 
 const signToken = id => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES });
 
@@ -11,7 +22,9 @@ const registerUser = async ({ password, email, subscription }) => {
 			return null;
 		}
 
-		const createdUser = await User.create({ password, email, subscription });
+		const avatarURL = gravatar.url(email, { s: 250, d: "retro" });
+
+		const createdUser = await User.create({ password, email, subscription, avatarURL });
 
 		createdUser.password = undefined;
 
@@ -62,9 +75,39 @@ const updateUserSubscr = async (_id, { subscription }) => {
 	}
 };
 
+const updateUserAvatar = async (req, res) => {
+	const { path: uploadPath, mimetype } = req.file;
+	const { _id: id } = req.user;
+
+	const ext = mimetype.split("/")[1];
+	const uniqueFileName = `${id}_${nanoid()}.${ext}`;
+	const avatarPath = path.join(avatarDir, uniqueFileName);
+	const avatarURL = path.join("/avatars", uniqueFileName);
+	try {
+		const avatarImg = await Jimp.read(uploadPath);
+		avatarImg.resize(250, 250).quality(90).write(uploadPath);
+
+		await fs.rename(uploadPath, avatarPath);
+
+		await User.findByIdAndUpdate(req.user._id, { avatarURL });
+
+		res.status(200).json({
+			status: "success",
+			code: 200,
+			data: {
+				result: avatarURL,
+			},
+		});
+	} catch (error) {
+		fs.unlink(uploadPath);
+		throw new Error(error);
+	}
+};
+
 module.exports = {
 	registerUser,
 	loginUser,
 	logoutUser,
 	updateUserSubscr,
+	updateUserAvatar,
 };
