@@ -24,6 +24,7 @@ const userSchema = new Schema(
 			enum: Object.values(USER_SUBSCR_ENUM),
 			default: USER_SUBSCR_ENUM.STARTER,
 		},
+		avatarURL: String,
 		token: {
 			type: String,
 			default: null,
