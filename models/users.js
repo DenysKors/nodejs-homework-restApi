@@ -7,8 +7,9 @@ const gravatar = require("gravatar");
 const { customAlphabet } = require("nanoid");
 
 const { User } = require("./userModel");
+const { sendEmail } = require("../utils/sendEmail");
 
-const nanoid = customAlphabet("1234567890", 5);
+const nanoid = customAlphabet("1234567890", 10);
 
 const avatarDir = path.join(__dirname, "..", "public", "avatars");
 
@@ -24,7 +25,11 @@ const registerUser = async ({ password, email, subscription }) => {
 
 		const avatarURL = gravatar.url(email, { s: 250, d: "retro" });
 
-		const createdUser = await User.create({ password, email, subscription, avatarURL });
+		const verificationToken = nanoid();
+
+		const createdUser = await User.create({ password, email, subscription, avatarURL, verificationToken });
+
+		await sendEmail(email, verificationToken);
 
 		createdUser.password = undefined;
 
@@ -38,7 +43,7 @@ const loginUser = async ({ password, email }) => {
 	try {
 		const user = await User.findOne({ email }).select("+password");
 
-		if (!user) {
+		if (!user || !user.verify) {
 			return null;
 		}
 
@@ -104,10 +109,42 @@ const updateUserAvatar = async (req, res) => {
 	}
 };
 
+const getUserByVerifyToken = async verificationToken => {
+	try {
+		const user = await User.findOne({ verificationToken });
+
+		if (!user) {
+			return null;
+		}
+
+		await User.findByIdAndUpdate(user._id, { verify: true, verificationToken: null });
+		return true;
+	} catch (error) {
+		throw new Error(error);
+	}
+};
+
+const getUserByEmail = async ({ email }) => {
+	try {
+		const user = await User.findOne({ email });
+
+		if (user.verify) {
+			return null;
+		}
+		const { verificationToken } = user;
+		await sendEmail(email, verificationToken);
+		return true;
+	} catch (error) {
+		throw new Error(error);
+	}
+};
+
 module.exports = {
 	registerUser,
 	loginUser,
 	logoutUser,
 	updateUserSubscr,
 	updateUserAvatar,
+	getUserByVerifyToken,
+	getUserByEmail,
 };
