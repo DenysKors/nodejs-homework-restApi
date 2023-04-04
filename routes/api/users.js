@@ -1,6 +1,14 @@
 const express = require("express");
-const { joiRegistrUserSchema, joiLoginSchema, joiSubscrSchema } = require("../../models/userModel");
-const { registerUser, loginUser, logoutUser, updateUserSubscr, updateUserAvatar } = require("../../models/users");
+const { joiRegistrUserSchema, joiLoginSchema, joiSubscrSchema, joiVerifySchema } = require("../../models/userModel");
+const {
+	registerUser,
+	loginUser,
+	logoutUser,
+	updateUserSubscr,
+	updateUserAvatar,
+	getUserByVerifyToken,
+	getUserByEmail,
+} = require("../../models/users");
 const { authProtect } = require("../../middlewares/authMiddleware");
 const { uploadUserAvatar } = require("../../middlewares/userMiddleware");
 
@@ -46,7 +54,7 @@ router.post("/login", async (req, res, next) => {
 		}
 		const loginedUser = await loginUser({ password, email });
 		if (!loginedUser) {
-			const error = new Error("Email or password is wrong");
+			const error = new Error("Email/password is wrong or verification needed");
 			error.status = 401;
 			throw error;
 		}
@@ -99,12 +107,12 @@ router.patch("/subscription", authProtect, async (req, res, next) => {
 		}
 		const { subscription } = req.body;
 		const { _id } = req.user;
-		const updatedSubscr = await updateUserSubscr(_id, { subscription });
+		const updatedUserSubscr = await updateUserSubscr(_id, { subscription });
 		res.status(200).json({
 			status: "success",
 			code: 200,
 			data: {
-				result: updatedSubscr,
+				result: updatedUserSubscr.subscription,
 			},
 		});
 	} catch (error) {
@@ -113,5 +121,50 @@ router.patch("/subscription", authProtect, async (req, res, next) => {
 });
 
 router.patch("/avatars", authProtect, uploadUserAvatar, updateUserAvatar);
+
+router.get("/verify/:verificationToken", async (req, res, next) => {
+	const { verificationToken } = req.params;
+	try {
+		const userByVerifyToken = await getUserByVerifyToken(verificationToken);
+		if (!userByVerifyToken) {
+			const error = new Error("User not found");
+			error.status = 404;
+			throw error;
+		}
+		res.status(200).json({
+			status: "success",
+			code: 200,
+			message: "Verification successful",
+		});
+	} catch (error) {
+		next(error);
+	}
+});
+
+router.post("/verify", async (req, res, next) => {
+	try {
+		const { error } = joiVerifySchema.validate(req.body);
+		if (error) {
+			error.status = 400;
+			throw error;
+		}
+
+		const userByEmail = await getUserByEmail(req.body);
+
+		if (!userByEmail) {
+			const error = new Error("Verification has already been passed");
+			error.status = 404;
+			throw error;
+		}
+
+		res.status(200).json({
+			status: "success",
+			code: 200,
+			message: "Verification email sent",
+		});
+	} catch (error) {
+		next(error);
+	}
+});
 
 module.exports = router;
